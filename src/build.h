@@ -66,7 +66,7 @@ struct Plan {
   };
 
   /// Mark an edge as done building (whether it succeeded or failed).
-  void EdgeFinished(Edge* edge, EdgeResult result);
+  bool EdgeFinished(Edge* edge, EdgeResult result, string* err);
 
   /// Clean the given node during the build.
   /// Return false on error.
@@ -80,7 +80,7 @@ struct Plan {
 
 private:
   bool AddSubTarget(Node* node, Node* dependent, string* err);
-  void NodeFinished(Node* node);
+  bool NodeFinished(Node* node, string* err);
 
   /// Enumerate possible steps we want for an edge.
   enum Want
