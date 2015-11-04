@@ -19,6 +19,7 @@
 #include <vector>
 using namespace std;
 
+#include "dyndep.h"
 #include "eval_env.h"
 #include "timestamp.h"
 #include "util.h"
@@ -269,7 +270,8 @@ struct DependencyScan {
                  DepfileParserOptions const* depfile_parser_options)
       : build_log_(build_log),
         disk_interface_(disk_interface),
-        dep_loader_(state, deps_log, disk_interface, depfile_parser_options) {}
+        dep_loader_(state, deps_log, disk_interface, depfile_parser_options),
+        dyndep_loader_(state, disk_interface) {}
 
   /// Update the |dirty_| state of the given node by inspecting its input edge.
   /// Examine inputs, outputs, and command lines to judge whether an edge
@@ -294,6 +296,9 @@ struct DependencyScan {
     return dep_loader_.deps_log();
   }
 
+  bool LoadDyndeps(Node* node, string* err) const;
+  bool LoadDyndeps(Node* node, DyndepFile* ddf, string* err) const;
+
  private:
   bool RecomputeDirty(Node* node, vector<Node*>* stack, string* err);
   bool VerifyDAG(Node* node, vector<Node*>* stack, string* err);
@@ -306,6 +311,7 @@ struct DependencyScan {
   BuildLog* build_log_;
   DiskInterface* disk_interface_;
   ImplicitDepLoader dep_loader_;
+  DyndepLoader dyndep_loader_;
 };
 
 #endif  // NINJA_GRAPH_H_
