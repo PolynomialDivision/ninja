@@ -571,7 +571,8 @@ Builder::Builder(State* state, const BuildConfig& config,
                  BuildLog* build_log, DepsLog* deps_log,
                  DiskInterface* disk_interface)
     : state_(state), config_(config), disk_interface_(disk_interface),
-      scan_(state, build_log, deps_log, disk_interface) {
+      scan_(state, build_log, deps_log, disk_interface,
+            &config_.depfile_parser_options) {
   status_ = new BuildStatus(config);
 }
 
@@ -920,7 +921,7 @@ bool Builder::ExtractDeps(CommandRunner::Result* result,
     if (content.empty())
       return true;
 
-    DepfileParser deps;
+    DepfileParser deps(config_.depfile_parser_options);
     if (!deps.Parse(&content, err))
       return false;
 
