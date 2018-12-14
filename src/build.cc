@@ -510,7 +510,7 @@ struct RealCommandRunner : public CommandRunner {
   // copy of config_.max_load_average; can be modified by TokenPool setup
   double max_load_average_;
   SubprocessSet subprocs_;
-  TokenPool *tokens_;
+  TokenPool* tokens_;
   map<Subprocess*, Edge*> subproc_to_edge_;
 };
 
