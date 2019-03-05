@@ -19,6 +19,7 @@
 #include <vector>
 using namespace std;
 
+#include "dyndep.h"
 #include "eval_env.h"
 #include "timestamp.h"
 #include "util.h"
@@ -40,6 +41,7 @@ struct Node {
         slash_bits_(slash_bits),
         mtime_(-1),
         dirty_(false),
+        dyndep_pending_(false),
         in_edge_(NULL),
         id_(-1) {}
 
@@ -87,6 +89,9 @@ struct Node {
   void set_dirty(bool dirty) { dirty_ = dirty; }
   void MarkDirty() { dirty_ = true; }
 
+  bool dyndep_pending() const { return dyndep_pending_; }
+  void set_dyndep_pending(bool ddl) { dyndep_pending_ = ddl; }
+
   Edge* in_edge() const { return in_edge_; }
   void set_in_edge(Edge* edge) { in_edge_ = edge; }
 
@@ -116,6 +121,10 @@ private:
   /// edges to build.
   bool dirty_;
 
+  /// Store whether dyndep information is expected from this node but
+  /// has not yet been loaded.
+  bool dyndep_pending_;
+
   /// The Edge that produces this Node, or NULL when there is no
   /// known edge to produce it.
   Edge* in_edge_;
@@ -135,8 +144,8 @@ struct Edge {
     VisitDone
   };
 
-  Edge() : rule_(NULL), pool_(NULL), env_(NULL), mark_(VisitNone),
-           outputs_ready_(false), deps_missing_(false),
+  Edge() : rule_(NULL), pool_(NULL), dyndep_(NULL), env_(NULL), mark_(VisitNone),
+           outputs_ready_(false), deps_loaded_(false), deps_missing_(false),
            implicit_deps_(0), order_only_deps_(0), implicit_outs_(0) {}
 
   /// Return true if all inputs' in-edges are ready.
@@ -153,6 +162,8 @@ struct Edge {
 
   /// Like GetBinding("depfile"), but without shell escaping.
   string GetUnescapedDepfile();
+  /// Like GetBinding("dyndep"), but without shell escaping.
+  string GetUnescapedDyndep();
   /// Like GetBinding("rspfile"), but without shell escaping.
   string GetUnescapedRspfile();
 
@@ -162,9 +173,11 @@ struct Edge {
   Pool* pool_;
   vector<Node*> inputs_;
   vector<Node*> outputs_;
+  Node* dyndep_;
   BindingEnv* env_;
   VisitMark mark_;
   bool outputs_ready_;
+  bool deps_loaded_;
   bool deps_missing_;
 
   const Rule& rule() const { return *rule_; }
@@ -257,7 +270,8 @@ struct DependencyScan {
                  DepfileParserOptions const* depfile_parser_options)
       : build_log_(build_log),
         disk_interface_(disk_interface),
-        dep_loader_(state, deps_log, disk_interface, depfile_parser_options) {}
+        dep_loader_(state, deps_log, disk_interface, depfile_parser_options),
+        dyndep_loader_(state, disk_interface) {}
 
   /// Update the |dirty_| state of the given node by inspecting its input edge.
   /// Examine inputs, outputs, and command lines to judge whether an edge
@@ -282,6 +296,9 @@ struct DependencyScan {
     return dep_loader_.deps_log();
   }
 
+  bool LoadDyndeps(Node* node, string* err) const;
+  bool LoadDyndeps(Node* node, DyndepFile* ddf, string* err) const;
+
  private:
   bool RecomputeDirty(Node* node, vector<Node*>* stack, string* err);
   bool VerifyDAG(Node* node, vector<Node*>* stack, string* err);
@@ -294,6 +311,7 @@ struct DependencyScan {
   BuildLog* build_log_;
   DiskInterface* disk_interface_;
   ImplicitDepLoader dep_loader_;
+  DyndepLoader dyndep_loader_;
 };
 
 #endif  // NINJA_GRAPH_H_

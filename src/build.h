@@ -32,6 +32,7 @@
 
 struct BuildLog;
 struct BuildStatus;
+struct Builder;
 struct DiskInterface;
 struct Edge;
 struct Node;
@@ -40,7 +41,7 @@ struct State;
 /// Plan stores the state of a build plan: what we intend to build,
 /// which steps we're ready to execute.
 struct Plan {
-  Plan();
+  Plan(Builder* builder = NULL);
 
   /// Add a target to our plan (including all its dependencies).
   /// Returns false if we don't need to build this target; may
@@ -78,8 +79,13 @@ struct Plan {
   /// Reset state.  Clears want and ready sets.
   void Reset();
 
+  bool DyndepsLoaded(DependencyScan* scan, Node* node,
+                     DyndepFile const& ddf, string* err);
 private:
-  bool AddSubTarget(Node* node, Node* dependent, string* err);
+  bool RefreshDyndepDependents(DependencyScan* scan, Node* node, string* err);
+  void UnmarkDependents(Node* node, set<Node*>* dependents);
+  bool AddSubTarget(Node* node, Node* dependent, string* err,
+                    set<Edge*>* dyndep_walk);
   bool NodeFinished(Node* node, string* err);
 
   /// Enumerate possible steps we want for an edge.
@@ -110,6 +116,8 @@ private:
   map<Edge*, Want> want_;
 
   set<Edge*> ready_;
+
+  Builder* builder_;
 
   /// Total number of edges that have commands (not phony).
   int command_edges_;
@@ -200,6 +208,9 @@ struct Builder {
     scan_.set_build_log(log);
   }
 
+  /// Load the dyndep information provided by the given node.
+  bool LoadDyndeps(Node* node, string* err);
+
   State* state_;
   const BuildConfig& config_;
   Plan plan_;
@@ -230,6 +241,7 @@ struct BuildStatus {
   void BuildEdgeStarted(Edge* edge);
   void BuildEdgeFinished(Edge* edge, bool success, const string& output,
                          int* start_time, int* end_time);
+  void BuildLoadDyndeps();
   void BuildStarted();
   void BuildFinished();
 
