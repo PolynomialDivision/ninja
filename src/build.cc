@@ -333,11 +333,9 @@ bool Plan::AddSubTarget(Node* node, Node* dependent, string* err) {
   // mark it now.
   if (node->dirty() && want == kWantNothing) {
     want = kWantToStart;
-    ++wanted_edges_;
+    EdgeWanted(edge);
     if (edge->AllInputsReady())
       ScheduleWork(want_ins.first);
-    if (!edge->is_phony())
-      ++command_edges_;
   }
 
   if (!want_ins.second)
@@ -350,6 +348,12 @@ bool Plan::AddSubTarget(Node* node, Node* dependent, string* err) {
   }
 
   return true;
+}
+
+void Plan::EdgeWanted(Edge* edge) {
+  ++wanted_edges_;
+  if (!edge->is_phony())
+    ++command_edges_;
 }
 
 Edge* Plan::FindWork() {
@@ -420,15 +424,22 @@ bool Plan::NodeFinished(Node* node, string* err) {
       continue;
 
     // See if the edge is now ready.
-    if ((*oe)->AllInputsReady()) {
-      if (want_e->second != kWantNothing) {
-        ScheduleWork(want_e);
-      } else {
-        // We do not need to build this edge, but we might need to build one of
-        // its dependents.
-        if (!EdgeFinished(*oe, kEdgeSucceeded, err))
-          return false;
-      }
+    if (!EdgeMaybeReady(want_e, err))
+      return false;
+  }
+  return true;
+}
+
+bool Plan::EdgeMaybeReady(map<Edge*, Want>::iterator want_e, string* err) {
+  Edge* edge = want_e->first;
+  if (edge->AllInputsReady()) {
+    if (want_e->second != kWantNothing) {
+      ScheduleWork(want_e);
+    } else {
+      // We do not need to build this edge, but we might need to build one of
+      // its dependents.
+      if (!EdgeFinished(edge, kEdgeSucceeded, err))
+        return false;
     }
   }
   return true;
