@@ -215,6 +215,8 @@ parser.add_option('--with-gtest', metavar='PATH', help='ignored')
 parser.add_option('--with-python', metavar='EXE',
                   help='use EXE as the Python interpreter',
                   default=os.path.basename(sys.executable))
+parser.add_option('--without-token-pool', action='store_true',
+                  help='replace token pool implementation with a dummy one',)
 parser.add_option('--force-pselect', action='store_true',
                   help='ppoll() is used by default where available, '
                        'but some platforms may need to use pselect instead',)
@@ -519,7 +521,16 @@ if platform.is_windows():
         objs += cxx('minidump-win32', variables=cxxvariables)
     objs += cc('getopt')
 else:
-    objs += cxx('subprocess-posix')
+    for name in ['subprocess-posix']:
+        objs += cxx(name)
+if options.without_token_pool:
+    objs += cxx('tokenpool-none')
+else:
+    objs += cxx('tokenpool-gnu-make')
+    if platform.is_windows():
+        objs += cxx('tokenpool-gnu-make-win32')
+    else:
+        objs += cxx('tokenpool-gnu-make-posix')
 if platform.is_aix():
     objs += cc('getopt')
 if platform.is_msvc():
@@ -578,6 +589,8 @@ for name in ['build_log_test',
 if platform.is_windows():
     for name in ['includes_normalize_test', 'msvc_helper_test']:
         objs += cxx(name, variables=cxxvariables)
+if not options.without_token_pool:
+    objs += cxx('tokenpool_test')
 
 ninja_test = n.build(binary('ninja_test'), 'link', objs, implicit=ninja_lib,
                      variables=[('libs', libs)])
